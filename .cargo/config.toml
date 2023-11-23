@@ -8,11 +8,8 @@ rustflags = [
 ]
 
 [build]
-target = "thumbv7em-none-eabihf" # Cortex-M4F and Cortex-M7F (eg F, L4, H7)
+target = "thumbv7em-none-eabihf"
 
 [alias]
-#rb = "run"
-#rrb = "run --release --bin"
 b_stm32 = "build --target=thumbv7em-none-eabihf"
-r_flash= "run --target thumbv7m-none-eabi --release"
 test_a= "test --all --target=x86_64-unknown-linux-gnu -- --nocapture"

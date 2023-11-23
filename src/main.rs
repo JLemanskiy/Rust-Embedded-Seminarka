@@ -24,7 +24,7 @@ fn main() -> ! {
     // this line is required if you want to take advantage of ST-Link
     stm32_hal2::debug_workaround();
 
-    defmt::println!("Hello, world!");
+    defmt::println!("Init");
 
     let clock_cfg = Clocks::default();
     clock_cfg.setup().unwrap();
@@ -39,7 +39,6 @@ fn main() -> ! {
     );
     pwm_timer.enable_pwm_output(TimChannel::C1, OutputCompare::Pwm1, 0.5);
     pwm_timer.enable();
-    // Setup a delay, based on the Cortex-m systick.
     let led = Pin::new(Port::A, 5, PinMode::Alt(1));
     let mut button = Pin::new(Port::C, 13, PinMode::Input);
     button.enable_interrupt(Edge::Falling);
