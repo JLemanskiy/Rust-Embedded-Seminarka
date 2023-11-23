@@ -45,13 +45,13 @@ fn main() -> ! {
     unsafe {
         NVIC::unmask(pac::Interrupt::EXTI15_10);
     }
+    defmt::println!("Impreza");
     loop {
-        defmt::println!("Impreza");
         match free(|cs| PWM_MODE.borrow(cs).get()) {
             0 => pwm_timer.set_duty(TimChannel::C1, 20),
             1 => pwm_timer.set_duty(TimChannel::C1, 50),
             2 => pwm_timer.set_duty(TimChannel::C1, 100),
-            2_u8..=u8::MAX => pwm_timer.set_duty(TimChannel::C1, 0),
+            _=> pwm_timer.set_duty(TimChannel::C1, 0),
         }
     }
 }
@@ -70,9 +70,8 @@ pub fn exit() -> ! {
 #[interrupt]
 fn EXTI15_10() {
     gpio::clear_exti_interrupt(0);
-    if free(|cs| PWM_MODE.borrow(cs).get() == 0) {
-        free(|cs| PWM_MODE.borrow(cs).set(PWM_MODE.borrow(cs).get() + 1));
-    } else {
+    free(|cs| PWM_MODE.borrow(cs).set(PWM_MODE.borrow(cs).get() + 1));
+    if free(|cs| PWM_MODE.borrow(cs).get() == 4) {
         free(|cs| PWM_MODE.borrow(cs).set(0));
-    }
+}
 }
