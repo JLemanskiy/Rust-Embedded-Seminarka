@@ -15,12 +15,13 @@ mod app {
     use stm32l4xx_hal::{
         gpio::{ErasedPin, Output, PushPull},
         prelude::*,
-        timer::{Timer,Event},
+        timer::{Timer,Event}, device::{tim2, TIM2},
     };
 
     #[shared]
     struct Shared {
         led: ErasedPin<Output<PushPull>>,
+        app_timer:Timer<TIM2>,
     }
 
     #[local]
@@ -33,7 +34,7 @@ mod app {
         let mut rcc = cx.device.RCC.constrain();
         let mut pwr = cx.device.PWR.constrain(&mut rcc.apb1r1);
         let clocks = rcc.cfgr.freeze(&mut flash.acr, &mut pwr);
-        let mut app_timer = Timer::tim2(cx.device.TIM2, 1.kHz(), clocks, &mut rcc.apb1r1);
+        let mut app_timer = Timer::tim2(cx.device.TIM2, 1.Hz(), clocks, &mut rcc.apb1r1);
         let rtic_token = rtic_monotonics::create_systick_token!();
         rtic_monotonics::systick::Systick::start(cx.core.SYST, 8_000_000, rtic_token);
         let mut gpioa = cx.device.GPIOA.split(&mut rcc.ahb2);
@@ -42,43 +43,37 @@ mod app {
             .into_push_pull_output(&mut gpioa.moder, &mut gpioa.otyper);
         let mut led1 = led.erase();
         let (s, r) = make_channel!(u8, 5);
-        count_blinks::spawn(r).ok();
-        blink::spawn(s).ok();
         app_timer.listen(Event::TimeOut);
-        (Shared { led: led1 }, Local {})
+        (Shared { led: led1,app_timer }, Local {})
     }
 
-    #[idle]
+    #[idle(shared=[])]
     fn idle(_: idle::Context) -> ! {
-        defmt::info!("dupa");
         loop {
+            blink_h::spawn().ok();
+            blink_l::spawn().ok();
             continue;
         }
     }
 
     #[task(priority = 1,shared=[led])]
-    async fn blink(cx: blink::Context, mut sender: Sender<'static, u8, 5>) {
-        defmt::info!("Slow blink");
-        Systick::delay(50.millis()).await;
+    async fn blink_h(cx: blink_h::Context) {
+        Systick::delay(1000.millis()).await;
+        defmt::println!("Led high!");
         let mut led = cx.shared.led;
         led.lock(|led| led.set_high());
-        Systick::delay(50.millis()).await;
+
+    }
+    #[task(priority = 1,shared=[led])]
+    async fn blink_l(cx: blink_l::Context) {
+        Systick::delay(5000.millis()).await;
+        let mut led=cx.shared.led;
+        defmt::println!("Led low!");
         led.lock(|led| led.set_low());
-        sender.send(1).await.expect("Sending failed!")
     }
-    #[task(priority = 1)]
-    async fn count_blinks(cx: count_blinks::Context, mut reciever: Receiver<'static, u8, 5>) {
-        let mut counter: u8 = 0;
-        while let Ok(value) = reciever.recv().await {
-            counter += value
-        }
-        if counter == 100 {
-            defmt::println!("{}", counter);
-            counter = 0;
-        }
-    }
-    #[task(binds=TIM2,shared=[])]
-    fn timer2_timeout(cx:timer2_timeout::Context){
+    #[task(binds=TIM2,shared=[app_timer])]
+    fn timer2_timeout(mut cx:timer2_timeout::Context){
         defmt::println!("Hardware interrupt!");
+        cx.shared.app_timer.lock(|app_timer| app_timer.clear_interrupt(Event::TimeOut))
     }
 }
